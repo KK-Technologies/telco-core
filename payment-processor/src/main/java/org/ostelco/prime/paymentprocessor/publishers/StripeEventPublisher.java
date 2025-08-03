@@ -1,0 +1,43 @@
+// Converted from Kotlin: StripeEventPublisher.kt
+package org.ostelco.prime.paymentprocessor.publishers
+
+import com.google.protobuf.ByteString
+import com.google.protobuf.Timestamp
+import com.google.pubsub.v1.PubsubMessage
+import com.stripe.model.Event
+import org.ostelco.prime.paymentprocessor.ConfigRegistry
+import java.time.Instant
+import org.ostelco.common.publisherex.DelegatePubSubPublisher
+import org.ostelco.common.publisherex.PubSubPublisher
+
+package org.ostelco.prime.paymentprocessor.publishers
+
+import com.google.protobuf.ByteString
+import com.google.protobuf.Timestamp
+import com.google.pubsub.v1.PubsubMessage
+import com.stripe.model.Event
+import org.ostelco.prime.paymentprocessor.ConfigRegistry
+import java.time.Instant
+import org.ostelco.common.publisherex.DelegatePubSubPublisher
+import org.ostelco.common.publisherex.PubSubPublisher
+
+
+public public class StripeEventPublisher :
+        PubSubPublisher by DelegatePubSubPublisher(
+                topicId = ConfigRegistry.config.stripeEventTopicId,
+                projectId = ConfigRegistry.config.projectId) {
+
+    public void publish(event: Event) {
+
+        final var message = PubsubMessage.newBuilder()
+                .setPublishTime(Timestamp.newBuilder()
+                        .setSeconds(Instant.now().epochSecond))
+                .setData(event.byteString())
+                .build()
+        publishPubSubMessage(message)
+    }
+
+    /* Monkeypatching uber alles! */
+    private public void Event.byteString(): ByteString = ByteString.copyFromUtf8(this.toJson())
+
+}

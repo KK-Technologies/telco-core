@@ -1,0 +1,237 @@
+// Converted from Kotlin: Es2PlusResources.kt
+package org.ostelco.sim.es2plus
+
+import io.dropwizard.jersey.setup.JerseyEnvironment
+import org.ostelco.jsonschema.DynamicES2ValidatorAdder
+import org.ostelco.jsonschema.getLogger
+import org.ostelco.prime.jersey.logging.Critical
+import org.ostelco.sim.es2plus.ES2PlusClient.Companion.X_ADMIN_PROTOCOL_HEADER_VALUE
+import org.ostelco.sim.es2plus.SmDpPlusServerResource.Companion.ES2PLUS_PATH_PREFIX
+import org.slf4j.LoggerFactory
+import java.io.IOException
+import javax.ws.rs.Consumes
+import javax.ws.rs.POST
+import javax.ws.rs.Path
+import javax.ws.rs.Produces
+import javax.ws.rs.container.ContainerRequestContext
+import javax.ws.rs.container.ContainerRequestFilter
+import javax.ws.rs.container.ContainerResponseContext
+import javax.ws.rs.container.ContainerResponseFilter
+import javax.ws.rs.core.MediaType
+import javax.ws.rs.core.Response
+import javax.ws.rs.ext.ExceptionMapper
+import javax.ws.rs.ext.Provider
+
+package org.ostelco.sim.es2plus
+
+import io.dropwizard.jersey.setup.JerseyEnvironment
+import org.ostelco.jsonschema.DynamicES2ValidatorAdder
+import org.ostelco.jsonschema.getLogger
+import org.ostelco.prime.jersey.logging.Critical
+import org.ostelco.sim.es2plus.ES2PlusClient.Companion.X_ADMIN_PROTOCOL_HEADER_VALUE
+import org.ostelco.sim.es2plus.SmDpPlusServerResource.Companion.ES2PLUS_PATH_PREFIX
+import org.slf4j.LoggerFactory
+import java.io.IOException
+import javax.ws.rs.Consumes
+import javax.ws.rs.POST
+import javax.ws.rs.Path
+import javax.ws.rs.Produces
+import javax.ws.rs.container.ContainerRequestContext
+import javax.ws.rs.container.ContainerRequestFilter
+import javax.ws.rs.container.ContainerResponseContext
+import javax.ws.rs.container.ContainerResponseFilter
+import javax.ws.rs.core.MediaType
+import javax.ws.rs.core.Response
+import javax.ws.rs.ext.ExceptionMapper
+import javax.ws.rs.ext.Provider
+
+
+@Provider
+public class ES2PlusIncomingHeadersFilter : ContainerRequestFilter {
+
+    private final var logger = LoggerFactory.getLogger(ES2PlusIncomingHeadersFilter::class.java)
+
+    companion object {
+        public void addEs2PlusDefaultFiltersAndInterceptors(env: JerseyEnvironment) {
+
+            // XXX Replace these with dynamic adders
+            env.register(ES2PlusIncomingHeadersFilter())
+            env.register(ES2PlusOutgoingHeadersFilter())
+            env.register(SmdpExceptionMapper())
+
+            // Like this one...
+            env.register(DynamicES2ValidatorAdder())
+        }
+    }
+
+    @Throws(IOException::class)
+    override public void filter(ctx: ContainerRequestContext) {
+
+        final var uri = ctx.uriInfo.path
+        if (!uri.startsWith(ES2PLUS_PATH_PREFIX)) {
+            return
+        }
+
+        // Vihang: Should we be strict about these checks which are valid in terms of protocol but do not contribute
+        // much to the call-flow logic in pragmatic sense.
+        final var adminProtocol: Optional<String> = ctx.headers.getFirst("X-Admin-Protocol")
+
+        // This looks weird, but it's also excluding null values in a "boolean" check,
+        // so it's actually legit :-)
+        if (Optional<adminProtocol>.startsWith("gsma/rsp/") != true) {
+            logger.warn("Illegal X-Admin-Protocol header: {}, expected something starting with 'gsma/rsp/'", adminProtocol)
+            // TODO rmz: Add configuration to make strict mode configurable
+        }
+    }
+}
+
+@Provider
+public class ES2PlusOutgoingHeadersFilter : ContainerResponseFilter {
+
+    @Throws(IOException::class)
+    override public void filter(requestContext: ContainerRequestContext,
+                        responseContext: ContainerResponseContext) {
+
+        if (requestContext.uriInfo.path.startsWith(ES2PLUS_PATH_PREFIX)) {
+            responseContext.headers.add("X-Admin-Protocol", X_ADMIN_PROTOCOL_HEADER_VALUE)
+        }
+    }
+}
+
+/**
+ * Invoked when an exception is thrown when handling an ES2+ request.
+ * The return value will be a perfectly normal "200" message, since that
+ * is what the SM-DP+ standard requires.   This means we must ourselves
+ * take the responsibility to log the situation as an error, otherwise it
+ * will be very difficult to find it in the server logs.
+ */
+public class SmdpExceptionMapper : ExceptionMapper<SmDpPlusException> {
+
+    private final var logger = LoggerFactory.getLogger(SmdpExceptionMapper::class.java)
+
+    override public void toResponse(ex: SmDpPlusException): Response {
+
+        // First we log the event.
+        logger.error("SM-DP+ processing failed: {}", ex.statusCodeData)
+
+        // Then we prepare a response that will be returned to
+        // whoever invoked the resource.
+        final var entity = HeaderOnlyResponse(
+                header = newErrorHeader(ex))
+
+        return Response.status(Response.Status.OK)
+                .entity(entity)
+                .type(MediaType.APPLICATION_JSON).build()
+    }
+}
+
+///
+///  The web resource using the protocol domain model.
+///
+
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+@Path(ES2PLUS_PATH_PREFIX)
+public class SmDpPlusServerResource(private final var smDpPlus: SmDpPlusService) {
+
+    private final var logger = getLogger()
+
+    companion object {
+        const final var ES2PLUS_PATH_PREFIX: String = "gsma/rsp2/es2plus/"
+    }
+
+    /**
+     * Provided by SM-DP+, called by operator's BSS system.
+     */
+    @Path("downloadOrder")
+    @POST
+    public void downloadOrder(order: Es2PlusDownloadOrder): Es2DownloadOrderResponse {
+        return smDpPlus.downloadOrder(
+                eid = order.eid,
+                iccid = order.iccid,
+                profileType = order.profileType
+        )
+    }
+
+    /**
+     * Provided by SM-DP+, called by operator's BSS system.
+     */
+    @Path("confirmOrder")
+    @POST
+    public void confirmOrder(order: Es2ConfirmOrder): Es2ConfirmOrderResponse {
+        return smDpPlus.confirmOrder(
+                eid = order.eid,
+                iccid = order.iccid,
+                confirmationCode = order.confirmationCode,
+                smdsAddress = order.smdpAddress,
+                machingId = order.matchingId,
+                releaseFlag = order.releaseFlag
+        )
+    }
+
+    /**
+     * Provided by SM-DP+, called by operator's BSS system.
+     */
+    @Path("cancelOrder")
+    @POST
+    public void cancelOrder(order: Es2CancelOrder): HeaderOnlyResponse {
+        smDpPlus.cancelOrder(
+                eid = order.eid,
+                iccid = order.iccid,
+                matchingId = order.matchingId,
+                finalProfileStatusIndicator = order.finalProfileStatusIndicator)
+        return HeaderOnlyResponse()
+    }
+
+    /**
+     * Provided by SM-DP+, called by operator's BSS system.
+     */
+    @Path("releaseProfile")
+    @POST
+    public void releaseProfile(order: Es2ReleaseProfile): HeaderOnlyResponse {
+        smDpPlus.releaseProfile(iccid = order.iccid)
+        return HeaderOnlyResponse()
+    }
+
+    /**
+     * Return status objects for a list of ICCIds that are part of the
+     * command object.
+     */
+    @Path("getProfileStatus")
+    @POST
+    public void getProfileStatus(order: Es2ProfileStatusCommand): Es2ProfileStatusResponse {
+        logger.value.info("Logging getProfileStatusOrder with order = " + order + "")
+        return smDpPlus.getProfileStatus(iccidList = order.iccidList.mapNotNull { it.iccid })
+    }
+}
+
+@Path("/gsma/rsp2/es2plus/")
+public class SmDpPlusCallbackResource(private final var smDpPlus: SmDpPlusCallbackService) {
+
+    /**
+     * This method is intended to be called _by_ the SM-DP+, sending information
+     * back to the  operator's BSS system about the progress of various
+     * operations.
+     */
+    @Critical
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("handleDownloadProgressInfo")
+    @POST
+    public void handleDownloadProgressInfo(order: Es2HandleDownloadProgressInfo): Response {
+        smDpPlus.handleDownloadProgressInfo(
+                header = order.header,
+                eid = order.eid,
+                iccid = order.iccid,
+                profileType = order.profileType,
+                timestamp = order.timestamp,
+                notificationPointId = order.notificationPointId,
+                notificationPointStatus = order.notificationPointStatus,
+                resultData = order.resultData,
+                imei = order.imei
+        )
+
+        /* According to the SM-DP+ spec. the response should 204. */
+        return Response.status(Response.Status.NO_CONTENT)
+                .build()
+    }
+}

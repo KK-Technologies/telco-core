@@ -1,0 +1,63 @@
+// Converted from Kotlin: SecureArchiver.kt
+package org.ostelco.prime.securearchive
+
+import arrow.core.Either
+import arrow.core.extensions.fx
+import org.ostelco.prime.getLogger
+import org.ostelco.prime.securearchive.ConfigRegistry.config
+import org.ostelco.prime.securearchive.util.Encrypter.Companion.getEncrypter
+import org.ostelco.prime.securearchive.util.FileStore.saveLocalFile
+import org.ostelco.prime.securearchive.util.FileStore.uploadFileToCloudStorage
+import org.ostelco.prime.securearchive.util.Zip.generateZipFile
+import org.ostelco.prime.storage.StoreError
+import java.time.Instant
+
+package org.ostelco.prime.securearchive
+
+import arrow.core.Either
+import arrow.core.extensions.fx
+import org.ostelco.prime.getLogger
+import org.ostelco.prime.securearchive.ConfigRegistry.config
+import org.ostelco.prime.securearchive.util.Encrypter.Companion.getEncrypter
+import org.ostelco.prime.securearchive.util.FileStore.saveLocalFile
+import org.ostelco.prime.securearchive.util.FileStore.uploadFileToCloudStorage
+import org.ostelco.prime.securearchive.util.Zip.generateZipFile
+import org.ostelco.prime.storage.StoreError
+import java.time.Instant
+
+public class SecureArchiver : SecureArchiveService {
+
+    private final var logger by getLogger()
+
+    override public void archiveEncrypted(
+            customerId: String,
+            regionCodes: Collection<String>,
+            fileName: String,
+            dataMap: Map<String, ByteArray>): Either<StoreError, Unit> {
+
+        return Either.fx {
+            final var bucketName = config.storageBucket
+            logger.info("Generating Plain Zip data for customerId = {}", customerId)
+            final var plainZipData = generateZipFile(fileName, dataMap).bind()
+            (regionCodes
+                    .filter(config.regions::contains)
+                    + "global")
+                    .map(String::toLowerCase)
+                    .forEach { regionCode ->
+                        logger.info("Encrypt for region: {} for customerId = {}", regionCode, customerId)
+                        final var zipData = getEncrypter(regionCode).encrypt(plainZipData)
+                        if (bucketName.isEmpty()) {
+                            final var filePath = "" + regionCode + "_" + fileName + ".zip.tk"
+                            logger.info("No bucket set, saving file locally {}", filePath)
+                            saveLocalFile(filePath, zipData).bind()
+                        } else {
+                            final var filePath = "" + customerId + "/" + fileName + "_" + Instant.now() + ".zip.tk"
+                            final var bucket = "" + bucketName + "-" + regionCode + ""
+                            logger.info("Saving in cloud storage {} --> {}", bucket, filePath)
+                            uploadFileToCloudStorage(bucket, filePath, zipData).bind()
+                        }
+                    }
+            Unit
+        }
+    }
+}

@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.ostelco</groupId>
+    <artifactId>ostelco-core</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Ostelco Core</name>
+    <description>Ostelco Telco Core Platform - Java 17 Maven Build</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        
+        <!-- Java version -->
+        <java.version>17</java.version>
+        
+        <!-- Framework versions -->
+        <dropwizard.version>4.0.7</dropwizard.version>
+        <jersey.version>3.1.5</jersey.version>
+        <jackson.version>2.16.1</jackson.version>
+        
+        <!-- Database versions -->
+        <neo4j.version>5.15.0</neo4j.version>
+        <postgresql.version>42.7.1</postgresql.version>
+        <redis.version>5.0.1</redis.version>
+        
+        <!-- Cloud and messaging -->
+        <google.cloud.version>26.29.0</google.cloud.version>
+        <firebase.version>9.2.0</firebase.version>
+        
+        <!-- Testing versions -->
+        <junit.version>5.10.1</junit.version>
+        <mockito.version>5.8.0</mockito.version>
+        <assertj.version>3.25.3</assertj.version>
+        
+        <!-- Utility versions -->
+        <slf4j.version>2.0.9</slf4j.version>
+        <logback.version>1.4.14</logback.version>
+        <apache.commons.version>3.14.0</apache.commons.version>
+        
+        <!-- Additional dependency versions -->
+        <stripe.version>24.16.0</stripe.version>
+        <graphql.java.version>21.3</graphql.java.version>
+        <grpc.version>1.60.1</grpc.version>
+        
+        <!-- Plugin versions -->
+        <maven.compiler.plugin.version>3.12.1</maven.compiler.plugin.version>
+        <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
+        <maven.failsafe.plugin.version>3.2.5</maven.failsafe.plugin.version>
+    </properties>
+
+    <modules>
+        <!-- Core modules -->
+        <module>model</module>
+        <module>prime-modules</module>
+        <module>logging</module>
+        <module>jersey</module>
+        
+        <!-- Data access modules -->
+        <module>data-store</module>
+        <module>neo4j-store</module>
+        <module>document-data-store</module>
+        <module>scaninfo-datastore</module>
+        
+        <!-- Service modules -->
+        <module>auth-server</module>
+        <module>prime</module>
+        <module>customer-endpoint</module>
+        <module>admin-endpoint</module>
+        <module>customer-support-endpoint</module>
+        
+        <!-- Business logic modules -->
+        <module>payment-processor</module>
+        <module>ocs-ktc</module>
+        <module>ocsgw</module>
+        <module>ekyc</module>
+        <module>imei-lookup</module>
+        
+        <!-- Communication modules -->
+        <module>app-notifier</module>
+        <module>email-notifier</module>
+        <module>slack</module>
+        <module>publisher-extensions</module>
+        
+        <!-- External integrations -->
+        <module>appleid-auth-service</module>
+        <module>ext-auth-provider</module>
+        <module>ext-myinfo-emulator</module>
+        <module>firebase-extensions</module>
+        
+        <!-- Utility modules -->
+        <module>kts-engine</module>
+        <module>secure-archive</module>
+        <module>scaninfo-shredder</module>
+        <module>analytics-module</module>
+        <module>tracing</module>
+        <module>graphql</module>
+        
+        <!-- Protocol modules -->
+        <module>diameter-stack</module>
+        <module>diameter-ha</module>
+        <module>diameter-test</module>
+        
+        <!-- API modules -->
+        <module>ocs-grpc-api</module>
+        <module>prime-customer-api</module>
+        
+        <!-- Multi-module projects -->
+        <module>sim-administration</module>
+        <module>tools</module>
+        
+        <!-- Testing -->
+        <module>acceptance-tests</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Dropwizard BOM -->
+            <dependency>
+                <groupId>io.dropwizard</groupId>
+                <artifactId>dropwizard-bom</artifactId>
+                <version>${dropwizard.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            
+            <!-- Google Cloud BOM -->
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>libraries-bom</artifactId>
+                <version>${google.cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            
+            <!-- JUnit BOM -->
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            
+            <!-- Jackson BOM -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            
+            <!-- Internal modules -->
+            <dependency>
+                <groupId>org.ostelco</groupId>
+                <artifactId>model</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ostelco</groupId>
+                <artifactId>prime-modules</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ostelco</groupId>
+                <artifactId>logging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ostelco</groupId>
+                <artifactId>jersey</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ostelco</groupId>
+                <artifactId>diameter-stack</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <!-- External dependencies -->
+            <dependency>
+                <groupId>org.glassfish.jersey.core</groupId>
+                <artifactId>jersey-server</artifactId>
+                <version>${jersey.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.neo4j.driver</groupId>
+                <artifactId>neo4j-java-driver</artifactId>
+                <version>${neo4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.stripe</groupId>
+                <artifactId>stripe-java</artifactId>
+                <version>${stripe.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.graphql-java</groupId>
+                <artifactId>graphql-java</artifactId>
+                <version>${graphql.java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-stub</artifactId>
+                <version>${grpc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-protobuf</artifactId>
+                <version>${grpc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-netty-shaded</artifactId>
+                <version>${grpc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.firebase</groupId>
+                <artifactId>firebase-admin</artifactId>
+                <version>${firebase.version}</version>
+            </dependency>
+            
+            <!-- Common dependencies -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${apache.commons.version}</version>
+            </dependency>
+            
+            <!-- Testing dependencies -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>${assertj.version}</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                    </configuration>
+                </plugin>
+                
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.plugin.version}</version>
+                    <configuration>
+                        <useSystemClassLoader>false</useSystemClassLoader>
+                    </configuration>
+                </plugin>
+                
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven.failsafe.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>integration-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

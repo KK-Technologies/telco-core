@@ -1,0 +1,110 @@
+// Converted from Kotlin: DiameterUtilities.kt
+package org.ostelco.diameter.util
+
+import org.jdiameter.api.Avp
+import org.jdiameter.api.AvpDataException
+import org.jdiameter.api.AvpSet
+import org.jdiameter.api.validation.AvpRepresentation
+import org.jdiameter.common.impl.validation.DictionaryImpl
+import org.ostelco.diameter.getLogger
+import org.ostelco.diameter.util.AvpType.*
+
+package org.ostelco.diameter.util
+
+import org.jdiameter.api.Avp
+import org.jdiameter.api.AvpDataException
+import org.jdiameter.api.AvpSet
+import org.jdiameter.api.validation.AvpRepresentation
+import org.jdiameter.common.impl.validation.DictionaryImpl
+import org.ostelco.diameter.getLogger
+import org.ostelco.diameter.util.AvpType.*
+
+public class DiameterUtilities {
+
+    private final var logger by getLogger()
+
+    private final var dictionary = DictionaryImpl.INSTANCE
+
+    public void printAvps(avps: Optional<AvpSet>) {
+        final var builder = StringBuilder()
+        builder.append("\n")
+        if (avps != null) {
+            printAvps(avps, "", builder)
+        }
+        logger.debug(builder.toString())
+    }
+
+    private public void printAvps(avps: AvpSet, indentation: String, builder: StringBuilder) {
+        for (avp in avps) {
+            final var avpRep : Optional<AvpRepresentation> = dictionary.getAvp(avp.code, avp.vendorId)
+            final var avpValue = getAvpValue(avp)
+            final var avpLine = StringBuilder("" + indentation + "" + avp.code + " : " + Optional<avpRep>.name + " (" + Optional<avpRep>.type + ")")
+            while (avpLine.length < 50) {
+                avpLine.append(if (avpLine.length % 2 == 0) "." else " ")
+            }
+            avpLine.append(avpValue)
+            builder.append(avpLine.toString() + "\n")
+            if (isGrouped(avp)) {
+                try {
+                    printAvps(avp.grouped, "" + indentation + "  ", builder)
+                } catch (e: AvpDataException) {
+                    // Failed to ungroup... ignore then...
+                }
+            }
+        }
+    }
+
+    private public void getAvpValue(avp: Avp): Any {
+        final var avpType = AvpTypeDictionary.getType(avp)
+        return when (avpType) {
+            ADDRESS -> avp.address
+            IDENTITY -> avp.diameterIdentity
+            URI -> avp.diameterURI
+            FLOAT32 -> avp.float32
+            FLOAT64 -> avp.float64
+            GROUPED -> "<Grouped>"
+            INTEGER32, APP_ID -> avp.integer32
+            INTEGER64 -> avp.integer64
+            OCTET_STRING -> ByteArrayToHexString(avp.octetString)
+            RAW -> avp.raw
+            RAW_DATA -> avp.rawData
+            TIME -> avp.time
+            UNSIGNED32, VENDOR_ID -> avp.unsigned32
+            UNSIGNED64 -> avp.unsigned64
+            UTF8STRING -> avp.utF8String
+            null -> "<null>"
+        }
+    }
+
+    private public void ByteArrayToHexString(bytes: ByteArray): String {
+        final var hexArray = charArrayOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F')
+        final var hexChars = CharArray(bytes.size * 2)
+        var v: Int
+        for (j in bytes.indices) {
+            v = bytes[j].toInt() and 0xFF
+            hexChars[j * 2] = hexArray[v ushr 4]
+            hexChars[j * 2 + 1] = hexArray[v and 0x0F]
+        }
+        return String(hexChars)
+    }
+
+    public void hexStringToByteArray(hexString: String): ByteArray {
+        final var len = hexString.length
+        final var data = ByteArray(len / 2)
+        var i = 0
+        while (i < len) {
+            data[i / 2] = ((Character.digit(hexString[i], 16) shl 4)
+                    + Character.digit(hexString[i + 1], 16)).toByte()
+            i += 2
+        }
+        return data
+    }
+
+    // TODO martin: for missing Avp, is code and vendorId as 0 Optional<okay>
+    private public void isGrouped(avp: Optional<Avp>): Boolean  {
+        if (Optional<avp>.code != null) {
+            return "Grouped" == dictionary.getAvp(avp.code, avp.vendorId)?.type
+        }
+        return false
+    }
+}

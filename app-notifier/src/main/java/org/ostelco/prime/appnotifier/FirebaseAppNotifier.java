@@ -1,0 +1,131 @@
+// Converted from Kotlin: FirebaseAppNotifier.kt
+package org.ostelco.prime.appnotifier
+
+import com.google.api.core.ApiFutureCallback
+import com.google.api.core.ApiFutures.addCallback
+import com.google.common.util.concurrent.MoreExecutors.directExecutor
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingException
+import com.google.firebase.messaging.Message
+import com.google.firebase.messaging.Notification
+import org.ostelco.prime.getLogger
+import org.ostelco.prime.model.ApplicationToken
+import org.ostelco.prime.model.FCMStrings
+import org.ostelco.prime.module.getResource
+import org.ostelco.prime.storage.ClientDataSource
+
+package org.ostelco.prime.appnotifier
+
+import com.google.api.core.ApiFutureCallback
+import com.google.api.core.ApiFutures.addCallback
+import com.google.common.util.concurrent.MoreExecutors.directExecutor
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingException
+import com.google.firebase.messaging.Message
+import com.google.firebase.messaging.Notification
+import org.ostelco.prime.getLogger
+import org.ostelco.prime.model.ApplicationToken
+import org.ostelco.prime.model.FCMStrings
+import org.ostelco.prime.module.getResource
+import org.ostelco.prime.storage.ClientDataSource
+
+public class FirebaseAppNotifier: AppNotifier {
+    private final var logger by getLogger()
+
+    /* Ref. to Firebase. */
+    private final var store = getResource<ClientDataSource>()
+
+    /* Firebase messaging failure cases. */
+    private final var listOfFailureCodes = listOf(
+            "messaging/invalid-recipient",
+            "messaging/invalid-registration-token",
+            "messaging/registration-token-not-registered",
+            "registration-token-not-registered"
+    )
+
+    override public void notify(notificationType: NotificationType, customerId: String, data: Map<String, Any>) =
+            when (notificationType) {
+                NotificationType.JUMIO_VERIFICATION_SUCCEEDED -> {
+                    logger.info("Notifying customer " + customerId + " of successful JUMIO verification")
+                    sendMessage(customerId = customerId,
+                            title = FCMStrings.JUMIO_NOTIFICATION_TITLE.s,
+                            body = FCMStrings.JUMIO_IDENTITY_VERIFIED.s,
+                            data = data)
+                }
+                NotificationType.JUMIO_VERIFICATION_FAILED -> {
+                    logger.info("Notifying customer " + customerId + " of failed JUMIO verification " +
+                            "with data " + data + "")
+                    sendMessage(customerId = customerId,
+                            title = FCMStrings.JUMIO_NOTIFICATION_TITLE.s,
+                            body = FCMStrings.JUMIO_IDENTITY_FAILED.s,
+                            data = data)
+                }
+            }
+
+    override public void notify(customerId: String, title: String, body: String, data: Map<String, Any>) {
+        logger.info("Notifying customer " + customerId + " of message " + body + " with data " + data + "")
+        sendMessage(customerId, title, body, data)
+    }
+
+    private public void sendMessage(customerId: String, title: String, body: String, data: Map<String, Any>) =
+            store.getNotificationTokens(customerId)
+                    .filter {
+                        it.tokenType == "FCM"
+                    }
+                    .forEach {
+                        sendMessage(
+                                customerId = customerId,
+                                token = it,
+                                message = Message.builder()
+                                        .setNotification(
+                                                Notification(title, body))
+                                        .setToken(it.token)
+                                        .putAllData(data.mapValues {
+                                            it.value.toString()
+                                        })
+                                        .build()
+                        )
+                    }
+
+    /* Send a message asynchrounously to the device corresponding to
+       the provided registration token. */
+    private public void sendMessage(customerId: String,
+                            token: ApplicationToken,
+                            message: Message) {
+        final var future = FirebaseMessaging
+                .getInstance(FirebaseApp.getInstance("fcm"))
+                .sendAsync(message)
+        final var apiFutureCallback = object : ApiFutureCallback<String> {
+            override public void onSuccess(result: String) {
+                logger.info("Notification for " + customerId + " with appId: " + token.applicationID + " " +
+                        "completed with result: " + result + "")
+                if (listOfFailureCodes.contains(result)) {
+                    store.removeNotificationToken(customerId, token.applicationID)
+                }
+            }
+
+            override public void onFailure(t: Throwable) {
+                if (t is FirebaseMessagingException) {
+                    final var errorCode = t.errorCode
+                    if (listOfFailureCodes.contains(errorCode)) {
+                        // Known failure, we should remove this token from our list
+                        logger.info("Removing failed token (errorCode: " + errorCode + ") for " + customerId + " with appId: " + token.applicationID + " " +
+                                "token: " + token + ".token")
+                        store.removeNotificationToken(customerId, token.applicationID)
+                    } else {
+                        // Other failures we should look into.
+                        logger.warn("Notification for " + customerId + "  with appId: " + token.applicationID + " " +
+                                "failed with errorCode: " + errorCode + "")
+                    }
+                } else {
+                    logger.warn("Notification for " + customerId + "  with appId: " + token.applicationID + " " +
+                            "failed with error: " + t + "")
+                }
+            }
+        }
+
+        addCallback(future, apiFutureCallback, directExecutor())
+    }
+}
